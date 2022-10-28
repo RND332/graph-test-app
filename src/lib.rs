@@ -1,4 +1,4 @@
-mod graph_test_lib {
+pub mod graph_test_lib {
     use std::collections::{VecDeque, HashMap};
     use std::fmt::Debug;
     use std::fmt::Display;
@@ -40,20 +40,21 @@ mod graph_test_lib {
             }
         }
         pub fn breadth_first_search(&self, start: i32) -> HashMap<i32, Vec<i32>> {
-            let mut visited = HashMap::new();
+            let mut visited = vec![false; self.nodes.len()];
             let mut queue = VecDeque::new();
+            let mut result = HashMap::new();
             queue.push_back(start);
-            while !queue.is_empty() {
-                let node = queue.pop_front().unwrap();
-                if !visited.contains_key(&node) {
-                    visited.insert(node, Vec::new());
-                    for edge in &self.nodes.iter().find(|n| n.id == node).unwrap().edges {
+            while queue.len() > 0 {
+                let node = queue.pop_front().unwrap() - 1;
+                if !visited[node as usize] {
+                    visited[node as usize] = true;
+                    result.insert(node, self.nodes[node as usize].edges.clone());
+                    for edge in &self.nodes[node as usize].edges {
                         queue.push_back(*edge);
-                        visited.get_mut(&node).unwrap().push(*edge);
                     }
                 }
             }
-            visited
+            result
         }
         // Trivial Graph Format
         pub fn serialization(&self) -> String {
@@ -83,9 +84,8 @@ mod graph_test_lib {
                 for part in parts {
                     edges.push(part.parse::<i32>().unwrap());
                 }
-                let mut node = Node::new(id, data);
-                node.edges = edges;
-                nodes.push(Node::new(id, data));
+                let node = Node::new(id, data, edges);
+                nodes.push(node);
             }
             graph.add_nodes(nodes);
             graph
@@ -93,11 +93,11 @@ mod graph_test_lib {
     }
 
     impl<T> Node<T> where T : Debug + Display + ToString {
-        pub fn new(id: i32, data: T) -> Node<T> {
+        pub fn new(id: i32, data: T, edges: Vec<i32>) -> Node<T> {
             Node {
                 id: id,
                 data: data,
-                edges: Vec::new(),
+                edges: edges,
             }
         }
         pub fn add_edge(&mut self, edge: i32) {
@@ -112,97 +112,60 @@ mod tests {
 
     #[test]
     fn simple_creating() {
-        let mut node1 = Node::new(1, "Node 1");
-        let mut node2 = Node::new(2, "Node 2");
-        let mut node3 = Node::new(3, "Node 3");
+        let node = Node::new(1, "test", vec![2, 3]);
 
-        node1.add_edge(2);
-        node1.add_edge(3);
-        node2.add_edge(1);
-        node3.add_edge(1);
-
-        let mut graph = Graph::new();
-        graph.add_nodes(vec![node1, node2, node3]);
-
-        assert_eq!(graph.nodes.len(), 3);
+        assert_eq!(node.id, 1);
+        assert_eq!(node.data, "test");
+        assert_eq!(node.edges, vec![2, 3]);
     }
 
     #[test]
     #[should_panic]
     fn duplicate_node_id() {
-        let node1 = Node::new(1, "Node 1");
-        let node2 = Node::new(1, "Node 2");
-
         let mut graph = Graph::new();
-        graph.add_nodes(vec![node1, node2]);
+        let mut nodes = Vec::new();
+        nodes.push(Node::new(1, "a", vec![2, 3]));
+        nodes.push(Node::new(1, "b", vec![3]));
+        nodes.push(Node::new(3, "c", vec![]));
+        graph.add_nodes(nodes);
     }
 
     #[test]
     #[should_panic]
     fn non_existing_edge() {
-        let mut node1 = Node::new(1, "Node 1");
-        let node2 = Node::new(2, "Node 2");
-
-        node1.add_edge(2);
-        node1.add_edge(3);
-
         let mut graph = Graph::new();
-        graph.add_nodes(vec![node1, node2]);
+        let mut nodes = Vec::new();
+        nodes.push(Node::new(1, "a", vec![2, 3]));
+        nodes.push(Node::new(2, "b", vec![3]));
+        nodes.push(Node::new(3, "c", vec![4]));
+        graph.add_nodes(nodes);
     }
 
     #[test]
     fn simple_bfs() {
-        let mut node1 = Node::new(1, "Node 1");
-        let mut node2 = Node::new(2, "Node 2");
-        let mut node3 = Node::new(3, "Node 3");
-        let node4 = Node::new(4, "Node 4");
-        let node5 = Node::new(5, "Node 5");
-        let node6 = Node::new(6, "Node 6");
-        let node7 = Node::new(7, "Node 7");
-
-        node1.add_edge(2);
-        node1.add_edge(3);
-        node2.add_edge(4);
-        node2.add_edge(5);
-        node3.add_edge(6);
-        node3.add_edge(7);
-
         let mut graph = Graph::new();
-        graph.add_nodes(vec![node1, node2, node3, node4, node5, node6, node7]);
-
-        let result = graph.breadth_first_search(1);
-        assert_eq!(result.len(), 7);
-        assert_eq!(result.get(&1).unwrap().len(), 2);
-        assert_eq!(result.get(&2).unwrap().len(), 2);
-        assert_eq!(result.get(&3).unwrap().len(), 2);
-        assert_eq!(result.get(&4).unwrap().len(), 0);
-        assert_eq!(result.get(&5).unwrap().len(), 0);
-        assert_eq!(result.get(&6).unwrap().len(), 0);
-        assert_eq!(result.get(&7).unwrap().len(), 0);
+        let mut nodes = Vec::new();
+        nodes.push(Node::new(1, "a", vec![2, 3]));
+        nodes.push(Node::new(2, "b", vec![3]));
+        nodes.push(Node::new(3, "c", vec![]));
+        graph.add_nodes(nodes);
+        let visited = graph.breadth_first_search(1);
+        assert_eq!(visited.len(), 3);
+        assert_eq!(visited.get(&0).unwrap(), &vec![2, 3]);
+        assert_eq!(visited.get(&1).unwrap(), &vec![3]);
+        assert_eq!(visited.get(&2).unwrap(), &vec![]);
     }
 
     #[test]
     fn serialization() {
-        let mut node1 = Node::new(1, "Node");
-        let mut node2 = Node::new(2, "Node");
-        let mut node3 = Node::new(3, "Node");
-        let node4 = Node::new(4, "Node");
-        let node5 = Node::new(5, "Node");
-        let node6 = Node::new(6, "Node");
-        let node7 = Node::new(7, "Node");
-
-        node1.add_edge(2);
-        node1.add_edge(3);
-        node2.add_edge(4);
-        node2.add_edge(5);
-        node3.add_edge(6);
-        node3.add_edge(7);
-
         let mut graph = Graph::new();
-        graph.add_nodes(vec![node1, node2, node3, node4, node5, node6, node7]);
-
-        let result = graph.serialization();
-        assert_eq!(result, "1 Node 2 3 \n2 Node 4 5 \n3 Node 6 7 \n4 Node \n5 Node \n6 Node \n7 Node \n");
+        let mut nodes = Vec::new();
+        nodes.push(Node::new(1, "a", vec![2, 3]));
+        nodes.push(Node::new(2, "b", vec![3]));
+        nodes.push(Node::new(3, "c", vec![]));
+        graph.add_nodes(nodes);
+        let serialized = graph.serialization();
+        assert_eq!(serialized, "1 a 2 3 \n2 b 3 \n3 c \n");
     }
 
     #[test]
@@ -216,5 +179,8 @@ mod tests {
                                 7 Node ";
         let graph = Graph::<&str>::deserialization(serialized);
         assert_eq!(graph.nodes.len(), 7);
+        assert_eq!(graph.nodes.get(1).unwrap().edges.len(), 2);
+        assert_eq!(graph.nodes.get(2).unwrap().edges.len(), 2);
+        assert_eq!(graph.nodes.get(3).unwrap().edges.len(), 0);
     }
 }
